@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vue Quicksort Bar Plot Visualizer</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(to right, #f0f4f8, #d9e2ec);
+    }
+
+    #vueApp {
+      text-align: center;
+      padding: 30px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+      width: 90%;
+      max-width: 900px;
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 20px;
+      color: #2c3e50;
+    }
+
+    .bar-container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      margin: 20px 0;
+      height: 300px;
+      background: #f8f9fa;
+      border: 1px solid #070a0e;
+      border-radius: 8px;
+      overflow-x: auto;
+      padding: 10px;
+      min-height: 350px;
+    }
+
+    .bar {
+      margin: 0 3px;
+      width: 30px;
+      position: relative;
+      background-color: #3498db;
+      border-radius: 4px 4px 0 0;
+      transition: transform 0.3s, background-color 0.3s;
+    }
+
+    .bar .bar-value {
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 13px;
+      color: white;
+      font-weight: bold;
+      text-align: center;
+      width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      z-index: 2;
+    }
+
+    .bar.isActive { background-color: #e67e22; }
+    .bar.isPivot { background-color: #2ecc71; }
+    .bar.isFinished { background-color: #9b59b6; }
+    .bar.isSwapping { background-color: #f39c12; }
+
+    .bar-transition { transition-duration: 750ms; }
+
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background-color: #3498db;
+      color: white;
+      transition: background-color 0.3s;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: #2980b9;
+    }
+
+    button:disabled {
+      background-color: #bdc3c7;
+      cursor: not-allowed;
+    }
+
+    input[type="range"] {
+      width: 200px;
+      vertical-align: middle;
+    }
+
+    input[type="text"] {
+      padding: 8px 10px;
+      font-size: 15px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      width: 250px;
+    }
+
+    label {
+      font-weight: 600;
+      color: #34495e;
+      margin-right: 10px;
+    }
+
+    span {
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    p {
+      font-size: 16px;
+      font-weight: 600;
+      color: #27ae60;
+      margin-top: 10px;
+    }
+
+    .info-block {
+      margin-top: 20px;
+      background-color: #f4f6f8;
+      padding: 10px 15px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-weight: 600;
+      color: #34495e;
+    }
+
+    .array-state {
+      margin-top: 20px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #34495e;
+    }
+  </style>
+</head>
+<body>
+  <div id="vueApp">
+    <h1>Quicksort Bar Plot Visualizer</h1>
+
+    <div>
+      <label for="speed">Animation Speed (Delay):</label>
+      <input type="range" v-model.number="inpVal" id="speed" min="0" max="950" step="10">
+      <span>{{ inpVal }} ms</span>
+    </div>
+
+    <div>
+      <label for="arrayInput">Custom Array (comma-separated):</label>
+      <input type="text" id="arrayInput" v-model="customArrayInput" placeholder="e.g. 50, 30, 70" />
+      <button @click="setCustomArray">Set Custom Array</button>
+    </div>
+
+    <div class="bar-container">
+      <div v-for="(die, index) in dice" :key="die.keyNmbr"
+           :class="['bar', 'bar-transition', { 'isActive': die.isActive, 'isPivot': die.isPivot, 'isFinished': die.isFinished, 'isSwapping': die.isSwapping }]"
+           :style="{ height: die.dieNmbr + 'px', transitionDuration: delay + 'ms' }">
+        <div class="bar-value">{{ die.dieNmbr }}</div>
+      </div>
+    </div>
+
+    <div class="info-block">
+      <div>Current Partition: <span>{{ currentPartition }}</span></div>
+      <div>Pass Count: <span>{{ passCount }}</span></div>
+    </div>
+
+    <button :disabled="btnIsDisabled" @click="action">{{ buttonText }}</button>
+    <button @click="reset" :disabled="btnIsDisabled">Reset</button>
+    <p>{{ msgDone }}</p>
+
+    <div class="array-state">
+      <strong>Array States after each pass:</strong>
+      <pre>{{ arrayStates.join('\n') }}</pre>
+    </div>
+  </div>
+
+  <script>
+    const app = Vue.createApp({
+      data() {
+        return {
+          btnIsDisabled: false,
+          msgDone: '',
+          inpVal: 750,
+          dice: [],
+          keyNumber: 0,
+          buttonText: 'Quicksort',
+          customArrayInput: '',
+          currentPartition: '',
+          passCount: 0,
+          arrayStates: []
+        };
+      },
+      computed: {
+        delay() {
+          return 950 - this.inpVal;
+        }
+      },
+      methods: {
+        action() {
+          if (this.buttonText === "Quicksort") {
+            this.passCount = 0;
+            this.arrayStates = [];
+            this.quickSort(this.dice);
+          } else {
+            this.addDie50();
+          }
+        },
+        async partition(array, low, high) {
+          this.currentPartition = `[${low} to ${high}]`;
+          for (let i = low; i <= high; i++) array[i].isActive = true;
+          let pivot = array[low];
+          pivot.isPivot = true;
+          await new Promise(resolve => setTimeout(resolve, this.delay));
+
+          let i = low + 1;
+          for (let j = low + 1; j <= high; j++) {
+            if (array[j].dieNmbr < pivot.dieNmbr) {
+              [array[i], array[j]] = [array[j], array[i]];
+              array[i].isSwapping = true;
+              array[j].isSwapping = true;
+              await new Promise(resolve => setTimeout(resolve, this.delay));
+              array[i].isSwapping = false;
+              array[j].isSwapping = false;
+              i++;
+            }
+          }
+          [array[low], array[i - 1]] = [array[i - 1], array[low]];
+          await new Promise(resolve => setTimeout(resolve, this.delay));
+
+          for (let k = low; k <= high; k++) array[k].isActive = false;
+          pivot.isPivot = false;
+          array[i - 1].isFinished = true;
+          await new Promise(resolve => setTimeout(resolve, this.delay));
+
+          this.arrayStates.push(array.map(die => die.dieNmbr).join(', '));
+
+          return i - 1;
+        },
+        async quickSort(array, low = 0, high = array.length - 1) {
+          this.btnIsDisabled = true;
+          this.msgDone = '';
+          this.buttonText = "Quicksort";
+
+          if (low < high) {
+            this.passCount++;
+            let pivotIndex = await this.partition(array, low, high);
+            await this.quickSort(array, low, pivotIndex - 1);
+            await this.quickSort(array, pivotIndex + 1, high);
+          } else {
+            if (low === high) array[low].isFinished = true;
+          }
+
+          if (low === 0 && high === array.length - 1) {
+            this.msgDone = 'Done!';
+            this.buttonText = "New Values";
+            this.btnIsDisabled = false;
+            this.currentPartition = '—';
+          }
+        },
+        addDie() {
+          const newDie = {
+            dieNmbr: Math.ceil(Math.random() * 90 + 10),
+            keyNmbr: this.keyNumber++,
+            isActive: false,
+            isPivot: false,
+            isFinished: false,
+            isSwapping: false
+          };
+          this.dice.splice(Math.floor(Math.random() * (this.dice.length + 1)), 0, newDie);
+        },
+        addDie50() {
+          this.dice = [];
+          for (let i = 0; i < 18; i++) this.addDie();
+          this.buttonText = "Quicksort";
+          this.msgDone = '';
+          this.passCount = 0;
+          this.currentPartition = '—';
+          this.arrayStates = [];
+        },
+        reset() {
+          this.dice = [];
+          this.keyNumber = 0;
+          this.addDie50();
+        },
+        setCustomArray() {
+          const inputArray = this.customArrayInput.split(',').map(num => parseInt(num.trim(), 10));
+          if (inputArray.length > 0 && inputArray.every(num => !isNaN(num))) {
+            this.dice = inputArray.map((num, index) => ({
+              dieNmbr: Math.max(10, Math.min(300, num)),
+              keyNmbr: index,
+              isActive: false,
+              isPivot: false,
+              isFinished: false,
+              isSwapping: false
+            }));
+            this.keyNumber = inputArray.length;
+            this.buttonText = "Quicksort";
+            this.msgDone = '';
+            this.passCount = 0;
+            this.currentPartition = '—';
+            this.arrayStates = [];
+          }
+        }
+      },
+      mounted() {
+        this.addDie50();
+      }
+    });
+
+    app.mount('#vueApp');
+  </script>
+</body>
+</html>
