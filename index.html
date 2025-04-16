@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Quicksort  Visualizer</title>
+  <title>Quicksort Visualizer</title>
   <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47"></script>
   <style>
     body {
@@ -61,7 +61,7 @@
       left: 50%;
       transform: translateX(-50%);
       font-size: 13px;
-      color: white;
+      color: rgb(0, 0, 0);
       font-weight: bold;
       text-align: center;
       width: 100%;
@@ -167,7 +167,7 @@
     <div class="bar-container">
       <div v-for="(die, index) in dice" :key="die.keyNmbr"
            :class="['bar', 'bar-transition', { 'isActive': die.isActive, 'isPivot': die.isPivot, 'isFinished': die.isFinished, 'isSwapping': die.isSwapping }]"
-           :style="{ height: die.dieNmbr + 'px', transitionDuration: delay + 'ms' }">
+           :style="{ height: (die.dieNmbr * heightScale) + 'px', transitionDuration: delay + 'ms' }">
         <div class="bar-value">{{ die.dieNmbr }}</div>
       </div>
     </div>
@@ -206,6 +206,10 @@
       computed: {
         delay() {
           return 950 - this.inpVal;
+        },
+        heightScale() {
+          const maxVal = Math.max(...this.dice.map(d => d.dieNmbr), 1);
+          return maxVal < 50 ? 300 / maxVal : 1;
         }
       },
       methods: {
@@ -299,7 +303,7 @@
           const inputArray = this.customArrayInput.split(',').map(num => parseInt(num.trim(), 10));
           if (inputArray.length > 0 && inputArray.every(num => !isNaN(num))) {
             this.dice = inputArray.map((num, index) => ({
-              dieNmbr: Math.max(10, Math.min(300, num)),
+              dieNmbr: Math.min(300, num),
               keyNmbr: index,
               isActive: false,
               isPivot: false,
